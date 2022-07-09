@@ -1,16 +1,14 @@
 import serial
+import pynmeagps
+import datetime
+import pytz
 
-ser = serial.Serial('/dev/serial0')
-
-read_content = ""
+stream = serial.Serial('/dev/serial0', 9600)
+nmr = pynmeagps.NMEAReader(stream)
 
 while True:
-    read_content+=ser.read().decode()
-    for msg in read_content.split("\r\n")[:-1]:
-        # print(msg)
-        if msg.startswith("$GPGGA"):
-            print(msg.split(","))
-        else:
-            print(msg)
-    read_content = read_content.split("\r\n")[-1]
+    (raw_data, parsed_data) = nmr.read()
+    print(parsed_data.identity)
+    if parsed_data.identity == "GPRMC":
+        print(datetime.datetime.combine(parsed_data.date, parsed_data.time, tzinfo = pytz.utc)-datetime.datetime.now())
     
