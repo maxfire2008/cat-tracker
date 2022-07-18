@@ -12,12 +12,13 @@ import zlib
 import json
 import copy
 import requests
+import config
 from pprint import *
 
 stream = serial.Serial('/dev/serial0', 9600)
 nmr = pynmeagps.NMEAReader(stream)
 
-TOTP = pyotp.TOTP(open("secret.txt").read())
+TOTP = pyotp.TOTP(config.TOTP_SECRET)
 
 
 def transform(number, minimum, maximum):
@@ -33,10 +34,6 @@ def to_bits(number, bits, clamp=True):
         return bin(max(min(number, int('1'*bits, 2)), 0))[2:][-bits:].zfill(bits)
     else:
         return bin(max(number, int('1'*bits, 2), 0))[2:][-bits:].zfill(bits)
-
-
-LIMITS = {x.split(",")[0]: float(x.split(",")[1])
-          for x in open("limits.txt").read().split("\n")}
 
 def encode_data(DATA):
     ENCODED_DATA = b""
@@ -69,10 +66,10 @@ def encode_data(DATA):
     # 'LATITUDE': ,
     # 'LONGITUDE': ,
 
-    NORTH_LIMIT = LIMITS["NORTH"]
-    SOUTH_LIMIT = LIMITS["SOUTH"]
-    EAST_LIMIT = LIMITS["EAST"]
-    WEST_LIMIT = LIMITS["WEST"]
+    NORTH_LIMIT = config.NORTH_LIMIT
+    SOUTH_LIMIT = config.SOUTH_LIMIT
+    EAST_LIMIT = config.EAST_LIMIT
+    WEST_LIMIT = config.WEST_LIMIT
 
     lat = struct.pack('>e', transform(
         DATA.get("LATITUDE", 0), NORTH_LIMIT, SOUTH_LIMIT))

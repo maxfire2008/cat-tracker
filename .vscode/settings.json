@@ -1,6 +1,11 @@
 {
     "cSpell.words": [
+        "csat",
+        "HDOP",
         "nmea",
-        "pynmeagps"
+        "PDOP",
+        "pynmeagps",
+        "svid",
+        "VDOP"
     ]
 }
