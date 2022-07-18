@@ -171,7 +171,7 @@ while True:
     # print(parsed_data.identity)
     if parsed_data.identity == "GPRMC":
         DATA["GPS_TIME"] = datetime.datetime.combine(
-            parsed_data.date, parsed_data.time, tzinfo=pytz.utc)
+            parsed_data.date, parsed_data.time, tzinfo=pytz.utc).timestamp()
         DATA["LATITUDE"] = noneify(parsed_data.lat)
         DATA["LONGITUDE"] = noneify(parsed_data.lon)
         DATA["SPEED"] = noneify(parsed_data.spd)
@@ -219,13 +219,14 @@ while True:
     if time.time() > LAST_SEND+SEND_INTERVAL:
         print("Sending data")
 
-        data_to_send = copy.deepcopy(DATA)
+        data_to_send = {}
         data_to_send["AUTH"] = TOTP.now()
         data_to_send["TRACKER_ID"] = config.TRACKER_ID
-        data_to_send["GPS_TIME"] = DATA["GPS_TIME"].timestamp()
+        data_to_send["GPS_TIME"] = DATA["GPS_TIME"]
         data_to_send["SYSTEM_TIME"] = time.time()
+        data_to_send["DATA"] = DATA
 
-        pprint(data_to_send)
+        # pprint(data_to_send)
         JSON_DUMP = json.dumps(data_to_send)
 
         data_encoded = json.dumps(data_to_send).encode()
