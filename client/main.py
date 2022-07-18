@@ -20,6 +20,10 @@ nmr = pynmeagps.NMEAReader(stream)
 
 TOTP = pyotp.TOTP(config.TOTP_SECRET)
 
+def noneify(x):
+    if x == '':
+        return None
+    return x
 
 def transform(number, minimum, maximum):
     return (number-minimum)/(maximum-minimum)
@@ -168,22 +172,22 @@ while True:
     if parsed_data.identity == "GPRMC":
         DATA["GPS_TIME"] = datetime.datetime.combine(
             parsed_data.date, parsed_data.time, tzinfo=pytz.utc)
-        DATA["LATITUDE"] = parsed_data.lat
-        DATA["LONGITUDE"] = parsed_data.lon
-        DATA["SPEED"] = parsed_data.spd
-        DATA["TRACK"] = parsed_data.cog
+        DATA["LATITUDE"] = noneify(parsed_data.lat)
+        DATA["LONGITUDE"] = noneify(parsed_data.lon)
+        DATA["SPEED"] = noneify(parsed_data.spd)
+        DATA["TRACK"] = noneify(parsed_data.cog)
 
         COLLECTED_FROM["GPRMC"] = True
     if parsed_data.identity == "GPGGA":
         # DATA["SATELLITES"] = parsed_data.numSV
-        DATA["ALTITUDE"] = parsed_data.alt
+        DATA["ALTITUDE"] = noneify(parsed_data.alt)
 
         COLLECTED_FROM["GPGGA"] = True
     if parsed_data.identity == "GPGSA":
         # PDOP^2 = HDOP^2 + VDOP^2
-        DATA["MODE"] = parsed_data.navMode
-        DATA["HORIZONTAL_DILUTION"] = parsed_data.HDOP
-        DATA["VERTICAL_DILUTION"] = parsed_data.VDOP
+        DATA["MODE"] = noneify(parsed_data.navMode)
+        DATA["HORIZONTAL_DILUTION"] = noneify(parsed_data.HDOP)
+        DATA["VERTICAL_DILUTION"] = noneify(parsed_data.VDOP)
         DATA["SATELLITES_USED"] = []
         for i in range(1, 13):
             exec("current_prn = parsed_data.svid_"+str(i).zfill(2))
@@ -200,10 +204,10 @@ while True:
                 exec("elevation = parsed_data.elv_"+str(i).zfill(2))
                 exec("azimuth = parsed_data.az_"+str(i).zfill(2))
                 exec("signal_strength = parsed_data.cno_"+str(i).zfill(2))
-                SATELLITES_NEW[svid] = {
-                    "ELEVATION": elevation,
-                    "AZIMUTH": azimuth,
-                    "SIGNAL_STRENGTH": signal_strength
+                SATELLITES_NEW[int(svid)] = {
+                    "ELEVATION": noneify(elevation),
+                    "AZIMUTH": noneify(azimuth),
+                    "SIGNAL_STRENGTH": noneify(signal_strength)
                 }
             except AttributeError as e:
                 # print(e)
@@ -233,7 +237,7 @@ while True:
             print("Hash, delta:", len(hash),len(delta))
             print("Data length:", len(data_encoded))
             print("Data saved:", len(data_encoded)-len(hash)-len(delta))
-            data_compressed = zlib.compress(delta)
+            data_compressed = zlib.compress(delta,9)
             print("COMPRESSED:", len(data_compressed))
 
             requests.post(config.SERVER+"/ping",data=b"1"+hash+data_compressed)
@@ -244,7 +248,7 @@ while True:
             print("Send original", len(data_encoded))
 
             hash = hashlib.md5(data_encoded).digest()[:4]
-            data_compressed = zlib.compress(data_encoded)
+            data_compressed = zlib.compress(data_encoded,9)
             requests.post(config.SERVER+"/ping",data=b"0"+hash+data_compressed)
 
             LAST_SEND_DATA = data_encoded
