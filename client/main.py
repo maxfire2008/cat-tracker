@@ -217,6 +217,7 @@ while True:
 
         data_to_send = copy.deepcopy(DATA)
         data_to_send["AUTH"] = TOTP.now()
+        data_to_send["TRACKER_ID"] = config.TRACKER_ID
         data_to_send["GPS_TIME"] = DATA["GPS_TIME"].timestamp()
         data_to_send["SYSTEM_TIME"] = time.time()
 
@@ -225,20 +226,27 @@ while True:
 
         data_encoded = json.dumps(data_to_send).encode()
 
-        if LAST_SEND_DATA and DELTAS_SENT < 100:
+        if LAST_SEND_DATA and DELTAS_SENT < 100 and config.SEND_DELTAS:
             delta = fossil_delta.create_delta(LAST_SEND_DATA, data_encoded)
             hash = hashlib.md5(data_encoded).digest()[:4]
 
             print("Hash, delta:", len(hash),len(delta))
             print("Data length:", len(data_encoded))
             print("Data saved:", len(data_encoded)-len(hash)-len(delta))
-            data_compressed = zlib.compress(hash+delta)
+            data_compressed = zlib.compress(delta)
             print("COMPRESSED:", len(data_compressed))
+
+            requests.post(config.SERVER+"/ping",data=b"1"+hash+data_compressed)
 
             LAST_SEND_DATA = data_encoded
             DELTAS_SENT += 1
         else:
             print("Send original", len(data_encoded))
+
+            hash = hashlib.md5(data_encoded).digest()[:4]
+            data_compressed = zlib.compress(data_encoded)
+            requests.post(config.SERVER+"/ping",data=b"0"+hash+data_compressed)
+
             LAST_SEND_DATA = data_encoded
 
         LAST_SEND = time.time()
