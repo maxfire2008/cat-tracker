@@ -233,6 +233,7 @@ while True:
         if LAST_SEND_DATA and DELTAS_SENT < 100 and config.SEND_DELTAS:
             delta = fossil_delta.create_delta(LAST_SEND_DATA, data_encoded)
             hash = hashlib.md5(data_encoded).digest()[:4]
+            last_send_data_hash = hashlib.md5(LAST_SEND_DATA).digest()[:4]
 
             print("Hash, delta:", len(hash),len(delta))
             print("Data length:", len(data_encoded))
@@ -240,7 +241,7 @@ while True:
             data_compressed = zlib.compress(delta,9)
             print("COMPRESSED:", len(data_compressed))
 
-            requests.post(config.SERVER+"/ping",data=b"1"+hash+data_compressed)
+            requests.post(config.SERVER+"/ping",data=b"1"+last_send_data_hash+hash+data_compressed)
 
             LAST_SEND_DATA = data_encoded
             DELTAS_SENT += 1
@@ -251,6 +252,7 @@ while True:
             data_compressed = zlib.compress(data_encoded,9)
             requests.post(config.SERVER+"/ping",data=b"0"+hash+data_compressed)
 
+            print("compressed version", len(data_compressed))
             LAST_SEND_DATA = data_encoded
 
         LAST_SEND = time.time()
