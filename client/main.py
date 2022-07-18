@@ -8,8 +8,10 @@ import struct
 import pyotp
 import fossil_delta
 import hashlib
+import zlib
 import json
 import copy
+import requests
 from pprint import *
 
 stream = serial.Serial('/dev/serial0', 9600)
@@ -215,13 +217,31 @@ while True:
         COLLECTED_FROM["GPGSV"] = True
     if time.time() > LAST_SEND+SEND_INTERVAL:
         print("Sending data")
-        
-        DATA_TO_SEND = copy.deepcopy(DATA)
-        DATA_TO_SEND["AUTH"] = TOTP.now()
-        DATA_TO_SEND["GPS_TIME"] = DATA["GPS_TIME"].timestamp()
-        DATA_TO_SEND["SYSTEM_TIME"] = time.time()
 
-        pprint(DATA_TO_SEND)
-        print(len(json.dumps(DATA_TO_SEND)))
-        
+        data_to_send = copy.deepcopy(DATA)
+        data_to_send["AUTH"] = TOTP.now()
+        data_to_send["GPS_TIME"] = DATA["GPS_TIME"].timestamp()
+        data_to_send["SYSTEM_TIME"] = time.time()
+
+        pprint(data_to_send)
+        JSON_DUMP = json.dumps(data_to_send)
+
+        data_encoded = json.dumps(data_to_send).encode()
+
+        if LAST_SEND_DATA and DELTAS_SENT < 100:
+            delta = fossil_delta.create_delta(LAST_SEND_DATA, data_encoded)
+            hash = hashlib.md5(data_encoded).digest()[:4]
+
+            print("Hash, delta:", len(hash),len(delta))
+            print("Data length:", len(data_encoded))
+            print("Data saved:", len(data_encoded)-len(hash)-len(delta))
+            data_compressed = zlib.compress(hash+delta)
+            print("COMPRESSED:", len(data_compressed))
+
+            LAST_SEND_DATA = data_encoded
+            DELTAS_SENT += 1
+        else:
+            print("Send original", len(data_encoded))
+            LAST_SEND_DATA = data_encoded
+
         LAST_SEND = time.time()

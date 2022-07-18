@@ -1,4 +1,3 @@
 .vs/**
 *.zcodex2
-client/limits.txt
-client/secret.txt
+client/config.py
