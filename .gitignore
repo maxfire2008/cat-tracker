@@ -1,3 +1,6 @@
 .vs/**
 *.zcodex2
 client/config.py
+
+*.pyc
+*.pyo
