@@ -8,6 +8,8 @@ import struct
 import pyotp
 import fossil_delta
 import hashlib
+import json
+import copy
 from pprint import *
 
 stream = serial.Serial('/dev/serial0', 9600)
@@ -213,22 +215,13 @@ while True:
         COLLECTED_FROM["GPGSV"] = True
     if time.time() > LAST_SEND+SEND_INTERVAL:
         print("Sending data")
-        # pprint(DATA)
-        data = encode_data(DATA)
-        # print(len(encode_data(DATA)))
-        if LAST_SEND_DATA and DELTAS_SENT < 100:
-            delta = fossil_delta.create_delta(LAST_SEND_DATA, data)
-            hash = hashlib.md5(data).digest()[:4]
-            REQUESTS.append(len(hash)+len(delta))
-            print("Hash, delta:", len(hash),len(delta))
-            print("Data length:", len(data))
-            print("Data saved:", len(data)-len(hash)-len(delta))
-            print(REQUESTS)
-            LAST_SEND_DATA = data
-        else:
-            REQUESTS.append(len(data))
-            print("Send original", len(data))
-            print(REQUESTS)
-            LAST_SEND_DATA = data
-        print("\n"+"-"*20+"\n")
+        
+        DATA_TO_SEND = copy.deepcopy(DATA)
+        DATA_TO_SEND["AUTH"] = TOTP.now()
+        DATA_TO_SEND["GPS_TIME"] = DATA["GPS_TIME"].timestamp()
+        DATA_TO_SEND["SYSTEM_TIME"] = time.time()
+
+        pprint(DATA_TO_SEND)
+        print(len(json.dumps(DATA_TO_SEND)))
+        
         LAST_SEND = time.time()
