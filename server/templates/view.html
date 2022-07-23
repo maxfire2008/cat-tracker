@@ -2,19 +2,114 @@
 <html>
     <head>
         <title>View</title>
+        <meta
+            name="viewport"
+            content="initial-scale=1,maximum-scale=1,user-scalable=no"
+        />
+        <link
+            href="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.css"
+            rel="stylesheet"
+        />
+        <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+            }
+            #map {
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                width: 100%;
+            }
+        </style>
     </head>
     <body>
         <p id="last_ping"></p>
+        <div id="map"></div>
+        <script
+            src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"
+            integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA=="
+            crossorigin="anonymous"
+        ></script>
+        <script type="text/javascript" charset="utf-8">
+            //<button class="mapboxgl-ctrl-compass" type="button" aria-label="Reset bearing to north">
+            //<span class="mapboxgl-ctrl-icon" aria-hidden="true" title="Reset bearing to north" style="transform: rotate(0deg);">
+            //</span></button>
+            class CenterOnTrackerControl {
+                onAdd(map) {
+                    this._map = map;
+                    this._container = document.createElement("button");
+                    this._container.className = "mapboxgl-ctrl";
+                    this._container.textContent = "FlyTo";
+                    this._container.onclick = centerMap;
+                    return this._container;
+                }
+
+                onRemove() {
+                    this._container.parentNode.removeChild(this._container);
+                    this._map = undefined;
+                }
+            }
+
+            var mapExists = false;
+            var map = null;
+            var marker = null;
+            var socket = io();
+            socket.on("connect", function () {
+                socket.emit("join", { tracker_id: "{{ tracker_id }}" });
+            });
+            socket.on("message", function (data) {
+                console.log(data);
+                last_ping.textContent = new Date(data["time"] * 1000);
+                if (!mapExists) {
+                    mapboxgl.accessToken = "{{ MAPBOX_TOKEN }}";
+                    map = new mapboxgl.Map({
+                        container: "map",
+                        style: "mapbox://styles/mapbox/satellite-streets-v11",
+                        center: [
+                            data["data"]["LONGITUDE"],
+                            data["data"]["LATITUDE"],
+                        ],
+                        zoom: 14,
+                    });
+
+                    marker = new mapboxgl.Marker()
+                        .setLngLat([
+                            data["data"]["LONGITUDE"],
+                            data["data"]["LATITUDE"],
+                        ])
+                        .addTo(map);
+                    map.addControl(new mapboxgl.NavigationControl());
+                    map.addControl(
+                        new mapboxgl.GeolocateControl({
+                            positionOptions: {
+                                enableHighAccuracy: true,
+                            },
+                            // When active the map will receive updates to the device's location as it changes.
+                            trackUserLocation: true,
+                            // Draw an arrow next to the location dot to indicate which direction the device is heading.
+                            showUserHeading: true,
+                        })
+                    );
+
+                    map.addControl(new CenterOnTrackerControl());
+
+                    centerMap();
+
+                    mapExists = true;
+                }
+            });
+            function centerMap() {
+                map.flyTo({
+                    center: [
+                        map._markers[0]._lngLat.lng,
+                        map._markers[0]._lngLat.lat,
+                    ],
+                    essential: true,
+                    zoom: 18,
+                });
+            }
+        </script>
     </body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js" integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA==" crossorigin="anonymous"></script>
-<script type="text/javascript" charset="utf-8">
-    var socket = io();
-    socket.on('connect', function() {
-        socket.emit('join', {tracker_id: "{{ tracker_id }}"});
-    });
-    socket.on('message', function(data) {
-        console.log(data);
-        document.getElementById('data').innerHTML = data.message;
-    });
-</script>
 </html>

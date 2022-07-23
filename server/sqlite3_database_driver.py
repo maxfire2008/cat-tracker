@@ -22,6 +22,7 @@ class Database:
             Database._instance = self
 
     def write_ping(self, tracker_id, time, data):
+        print(tracker_id, time, data)
         with self._lock:
             con = sqlite3.connect("database.db")
             cur = con.cursor()

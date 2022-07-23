@@ -5,3 +5,4 @@ client/config.py
 *.pyc
 *.pyo
 server/database.db
+server/config.py

@@ -1,4 +1,5 @@
 # Server
-* [ ] Authentication
+* [ ] Authentication of tracker
+* [ ] Authentication of viewer
 * [ ] Viewer
 * [ ] Delta support

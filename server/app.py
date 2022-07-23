@@ -4,6 +4,8 @@ import fossil_delta
 import hashlib
 import json
 import flask_socketio
+import config
+import time
 import sqlite3_database_driver as database_driver
 
 from pprint import pprint
@@ -28,12 +30,16 @@ def ping():
             db = database_driver.Database.getInstance()
             tracker_id = data["TRACKER_ID"]
             db.write_ping(tracker_id,
-                          data["GPS_TIME"], data)
-            flask_socketio.send(
-                message=db.fetch_pings(tracker_id=tracker_id, limit=1),
-                to=tracker_id,
-                namespace="/"
-            )
+                          time.time(), data)
+            try:
+                latest_ping = db.fetch_pings(tracker_id=tracker_id, limit=1)[0]
+                flask_socketio.send(
+                    message=latest_ping,
+                    to=tracker_id,
+                    namespace="/"
+                )
+            except IndexError:
+                pass
             # pprint(data)
         else:
             print("Data was malformed")
@@ -57,21 +63,32 @@ def fetch_pings():
 
 @app.route("/view/<tracker_id>")
 def view(tracker_id):
-    return flask.render_template("view.html", tracker_id=tracker_id)
+    return flask.render_template("view.html", tracker_id=tracker_id, MAPBOX_TOKEN=config.MAPBOX_TOKEN)
 
 
 @socketio.on('join')
 def on_join(data):
     tracker_id = data["tracker_id"]
     flask_socketio.join_room(tracker_id)
-    flask_socketio.send('New viewer of tracker', to=tracker_id)
+    # flask_socketio.send('New viewer of tracker', to=tracker_id)
+
+    db = database_driver.Database.getInstance()
+    try:
+        latest_ping = db.fetch_pings(tracker_id=tracker_id, limit=1)[0]
+        flask_socketio.send(
+            message=latest_ping,
+            to=tracker_id,
+            namespace="/"
+        )
+    except IndexError:
+        pass
 
 
 @socketio.on('leave')
 def on_leave(data):
     tracker_id = data["tracker_id"]
     flask_socketio.leave_room(tracker_id)
-    flask_socketio.send('Lost viewer of tracker', to=tracker_id)
+    # flask_socketio.send('Lost viewer of tracker', to=tracker_id)
 
 
 if __name__ == '__main__':

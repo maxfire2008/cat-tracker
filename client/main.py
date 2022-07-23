@@ -168,6 +168,10 @@ SATELLITES_NEW = {}
 
 while True:
     (raw_data, parsed_data) = nmr.read()
+
+    with open("/home/pi/serial_data/"+datetime.date.today().strftime("%Y-%m-%d"), "ab+") as file:
+        file.write(raw_data)
+    
     # print(parsed_data.identity)
     if parsed_data.identity == "GPRMC":
         DATA["GPS_TIME"] = datetime.datetime.combine(
@@ -242,7 +246,11 @@ while True:
             data_compressed = zlib.compress(delta,9)
             print("COMPRESSED:", len(data_compressed))
 
-            requests.post(config.SERVER+"/ping",data=b"1"+last_send_data_hash+hash+data_compressed)
+            try:
+                resp = requests.post(config.SERVER+"/ping",data=b"1"+last_send_data_hash+hash+data_compressed)
+                print(resp)
+            except Exception as e:
+                print(e)
 
             LAST_SEND_DATA = data_encoded
             DELTAS_SENT += 1
@@ -251,9 +259,15 @@ while True:
 
             hash = hashlib.md5(data_encoded).digest()[:4]
             data_compressed = zlib.compress(data_encoded,9)
-            requests.post(config.SERVER+"/ping",data=b"0"+hash+data_compressed)
 
             print("compressed version", len(data_compressed))
+            
+            try:
+                resp = requests.post(config.SERVER+"/ping",data=b"0"+hash+data_compressed)
+                print(resp)
+            except Exception as e:
+                print(e)
+
             LAST_SEND_DATA = data_encoded
 
         LAST_SEND = time.time()
