@@ -6,3 +6,4 @@ client/config.py
 *.pyo
 server/database.db
 server/config.py
+client/alternate_config.py

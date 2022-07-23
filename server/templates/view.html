@@ -25,7 +25,15 @@
         </style>
     </head>
     <body>
-        <p id="last_ping"></p>
+        <p
+            id="last_ping"
+            style="
+                position: absolute;
+                z-index: 5;
+                background-color: rgba(255, 255, 255, 0.5);
+                padding: 1%;
+            "
+        ></p>
         <div id="map"></div>
         <script
             src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"
@@ -66,7 +74,7 @@
                     mapboxgl.accessToken = "{{ MAPBOX_TOKEN }}";
                     map = new mapboxgl.Map({
                         container: "map",
-                        style: "mapbox://styles/mapbox/satellite-streets-v11",
+                        style: "mapbox://styles/max328756238453/cl5xs3r8e001v14p649hv5thz",
                         center: [
                             data["data"]["LONGITUDE"],
                             data["data"]["LATITUDE"],
