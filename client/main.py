@@ -11,6 +11,7 @@ import zlib
 import json
 import tkinter
 import requests
+import os
 from pprint import *
 
 
@@ -23,21 +24,56 @@ except KeyboardInterrupt:
     print("Using alternate_config.py")
     import alternate_config as config
 
+DATA = {}
+
+LAST_SEND = time.time()
+if config.RECORDING:
+    SEND_INTERVAL = 5
+else:
+    SEND_INTERVAL = 1
+COLLECTED_FROM = {}
+LAST_SEND_DATA = None
+DELTAS_SENT = 0
+
+SATELLITES_NEW = {}
+
+DATA_TO_PROCESS = []
 
 if config.RECORDING:
     stream = serial.Serial('/dev/serial0', 9600)
     nmr = pynmeagps.NMEAReader(stream)
 else:
     print("PLAYBACK MODE")
+    RECORDING_CONTENT = open(input("File:"), "rb").read(
+    ).decode().replace("\r\n", "\n").split("\n")
+
     frame = tkinter.Tk()
-    frame.geometry("200x200")
-    slider = tkinter.Scale(frame, from_=0, to=10, orient="horizontal")
-    slider.set(2)
+    frame.geometry("1500x200")
+
+    def apply(slider_passed=None):
+        global DATA
+        global COLLECTED_FROM
+        global SATELLITES_NEW
+        global DATA_TO_PROCESS
+        DATA = {}
+        COLLECTED_FROM = {}
+        SATELLITES_NEW = {}
+
+        if slider_passed:
+            slider_value = int(slider_passed)
+        else:
+            global slider
+            slider_value = slider.get()
+        print(time.time())
+        DATA_TO_PROCESS = RECORDING_CONTENT[max(
+            0, int(slider_value)-1000):int(slider_value)]
+
+    slider = tkinter.Scale(frame, from_=0, to=len(
+        RECORDING_CONTENT), orient="horizontal", length=1450, command=apply)
+    slider.set(0)
     slider.pack()
 
-    def reset():
-        slider.set(2)
-    reset_button = tkinter.Button(frame, text="reset", command=reset)
+    reset_button = tkinter.Button(frame, text="Apply", command=apply)
     reset_button.pack()
 
 TOTP = pyotp.TOTP(config.TOTP_SECRET)
@@ -64,30 +100,44 @@ def to_bits(number, bits, clamp=True):
         return bin(max(number, int('1'*bits, 2), 0))[2:][-bits:].zfill(bits)
 
 
-DATA = {}
-
-LAST_SEND = time.time()
-SEND_INTERVAL = 5
-COLLECTED_FROM = {}
-LAST_SEND_DATA = None
-DELTAS_SENT = 0
-
-REQUESTS = []
-
-SATELLITES_NEW = {}
-
 while True:
-    (raw_data, parsed_data) = nmr.read()
-
-    with open("/home/pi/serial_data/"+datetime.date.today().strftime("%Y-%m-%d"), "ab+") as file:
-        file.write(raw_data)
-
+    if config.RECORDING:
+        (raw_data, parsed_data) = nmr.read()
+        serial_save_path = "/home/pi/serial_data/"+datetime.date.today().strftime("%Y-%m-%d")+"/"+str(datetime.datetime.now().hour)
+        os.makedirs(os.path.dirname(serial_save_path), exist_ok=True)
+        with open(serial_save_path, "ab+") as file:
+            file.write(raw_data)
+    else:
+        while True:
+            raw_data = None
+            parsed_data = None
+            try:
+                raw_data = DATA_TO_PROCESS.pop(0)
+            except IndexError:
+                pass
+            if raw_data:
+                try:
+                    parsed_data = pynmeagps.NMEAReader.parse(raw_data)
+                except pynmeagps.exceptions.NMEAParseError as e:
+                    print(e)
+            if raw_data and parsed_data:
+                break
+            frame.update()
+    # if len(DATA_TO_PROCESS) % 1000 == 0:
+    #     print(len(DATA_TO_PROCESS))
     # print(parsed_data.identity)
     if parsed_data.identity == "GPRMC":
         DATA["GPS_TIME"] = datetime.datetime.combine(
             parsed_data.date, parsed_data.time, tzinfo=pytz.utc).timestamp()
         DATA["LATITUDE"] = noneify(parsed_data.lat)
         DATA["LONGITUDE"] = noneify(parsed_data.lon)
+
+        if parsed_data.lat or "LAST_KNOWN_LATITUDE" not in DATA:
+            DATA["LAST_KNOWN_LATITUDE"] = noneify(parsed_data.lat)
+            DATA["LAST_KNOWN_LONGITUDE"] = noneify(parsed_data.lon)
+            DATA["LAST_KNOWN_LOCATION_TIME"] = datetime.datetime.combine(
+                parsed_data.date, parsed_data.time, tzinfo=pytz.utc).timestamp()
+
         DATA["SPEED"] = noneify(parsed_data.spd)
         DATA["TRACK"] = noneify(parsed_data.cog)
 
@@ -130,13 +180,13 @@ while True:
             DATA["SATELLITES"] = SATELLITES_NEW
 
         COLLECTED_FROM["GPGSV"] = True
-    if time.time() > LAST_SEND+SEND_INTERVAL:
+    if (time.time() > LAST_SEND+SEND_INTERVAL and config.RECORDING) or ((not config.RECORDING) and len(DATA_TO_PROCESS) == 0):
         print("Sending data")
 
         data_to_send = {}
         data_to_send["AUTH"] = TOTP.now()
         data_to_send["TRACKER_ID"] = config.TRACKER_ID
-        data_to_send["GPS_TIME"] = DATA["GPS_TIME"]
+        data_to_send["GPS_TIME"] = DATA.get("GPS_TIME", None)
         data_to_send["SYSTEM_TIME"] = time.time()
         data_to_send["DATA"] = DATA
 
@@ -183,3 +233,5 @@ while True:
             LAST_SEND_DATA = data_encoded
 
         LAST_SEND = time.time()
+    if not config.RECORDING:
+        frame.update()

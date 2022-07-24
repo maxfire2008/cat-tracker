@@ -26,14 +26,19 @@
     </head>
     <body>
         <p
-            id="last_ping"
             style="
                 position: absolute;
                 z-index: 5;
                 background-color: rgba(255, 255, 255, 0.5);
                 padding: 1%;
             "
-        ></p>
+        >
+            Last ping (server time): <span id="last_ping"></span><br />
+            GPS_TIME: <span id="GPS_TIME"></span><br />
+            LAT: <span id="LATITUDE"></span><br />
+            LON: <span id="LONGITUDE"></span><br />
+            <span id="last_known_warn"></span>
+        </p>
         <div id="map"></div>
         <script
             src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"
@@ -69,7 +74,7 @@
             });
             socket.on("message", function (data) {
                 console.log(data);
-                last_ping.textContent = new Date(data["time"] * 1000);
+
                 if (!mapExists) {
                     mapboxgl.accessToken = "{{ MAPBOX_TOKEN }}";
                     map = new mapboxgl.Map({
@@ -82,12 +87,6 @@
                         zoom: 14,
                     });
 
-                    marker = new mapboxgl.Marker()
-                        .setLngLat([
-                            data["data"]["LONGITUDE"],
-                            data["data"]["LATITUDE"],
-                        ])
-                        .addTo(map);
                     map.addControl(new mapboxgl.NavigationControl());
                     map.addControl(
                         new mapboxgl.GeolocateControl({
@@ -107,16 +106,72 @@
 
                     mapExists = true;
                 }
+
+                if (data["data"]["LONGITUDE"] && data["data"]["LATITUDE"]) {
+                    try {
+                        last_known_marker.remove();
+                    } catch (ReferenceError) {}
+                    try {
+                        marker.setLngLat([
+                            data["data"]["LONGITUDE"],
+                            data["data"]["LATITUDE"],
+                        ]);
+                        marker.addTo(map);
+                    } catch (ReferenceError) {
+                        marker = new mapboxgl.Marker()
+                            .setLngLat([
+                                data["data"]["LONGITUDE"],
+                                data["data"]["LATITUDE"],
+                            ])
+                            .addTo(map);
+                    }
+                    last_known_warn.textContent = "";
+                } else if (
+                    data["data"]["LAST_KNOWN_LONGITUDE"] &&
+                    data["data"]["LAST_KNOWN_LATITUDE"]
+                ) {
+                    try {
+                        marker.remove();
+                    } catch (ReferenceError) {}
+                    try {
+                        marker.setLngLat([
+                            data["data"]["LAST_KNOWN_LONGITUDE"],
+                            data["data"]["LAST_KNOWN_LATITUDE"],
+                        ]);
+                        marker.addTo(map);
+                    } catch (ReferenceError) {
+                        marker = new mapboxgl.Marker()
+                            .setLngLat([
+                                data["data"]["LAST_KNOWN_LONGITUDE"],
+                                data["data"]["LAST_KNOWN_LATITUDE"],
+                            ])
+                            .addTo(map);
+                    }
+                    last_known_warn.textContent =
+                        "Showing last known position recorded at: " +
+                        new Date(
+                            data["data"]["LAST_KNOWN_LOCATION_TIME"] * 1000
+                        );
+                }
+
+                last_ping.textContent = new Date(data["time"] * 1000);
+                GPS_TIME.textContent = new Date(
+                    data["data"]["GPS_TIME"] * 1000
+                );
+                LATITUDE.textContent = data["data"]["LATITUDE"];
+                LONGITUDE.textContent = data["data"]["LONGITUDE"];
             });
             function centerMap() {
-                map.flyTo({
-                    center: [
-                        map._markers[0]._lngLat.lng,
-                        map._markers[0]._lngLat.lat,
-                    ],
-                    essential: true,
-                    zoom: 18,
-                });
+                if (map._markers.length != 0) {
+                    map.flyTo({
+                        center: [
+                            map._markers[0]._lngLat.lng,
+                            map._markers[0]._lngLat.lat,
+                        ],
+                        essential: true,
+                        zoom: 18,
+                    });
+                }
             }
         </script>
     </body>

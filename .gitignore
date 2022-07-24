@@ -7,3 +7,4 @@ client/config.py
 server/database.db
 server/config.py
 client/alternate_config.py
+client/serial_data/*
